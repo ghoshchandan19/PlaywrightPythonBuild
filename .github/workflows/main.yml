@@ -38,7 +38,7 @@ jobs:
       - name: Run tests
         run: |
           mkdir -p reports
-          pytest -q --junitxml=reports/junit.xml
+          xvfb-run pytest -q --junitxml=reports/junit.xml
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
