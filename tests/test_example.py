@@ -6,6 +6,6 @@ def test_open_google():
         browser = p.chromium.launch(headless=False)  # set True for headless
         page = browser.new_page()
         page.goto("https://www.google.com")
-        time.sleep(20)
+        time.sleep(10)
         assert "Google" in page.title()
         browser.close()
