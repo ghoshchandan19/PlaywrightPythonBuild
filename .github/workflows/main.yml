@@ -26,7 +26,7 @@ jobs:
             python -m pip install -r requirements.txt
           else
             echo "requirements.txt missing or empty — installing minimal deps"
-            python -m pip install playwright pytest pytest-playwright
+            python -m pip install playwright pytest pytest-playwright pytest-html
           fi
 
       - name: Install Playwright system dependencies
@@ -35,14 +35,21 @@ jobs:
       - name: Install Playwright browsers
         run: python -m playwright install
 
-      - name: Run tests
+      - name: Run tests and generate HTML report
         run: |
           mkdir -p reports
-          xvfb-run pytest -q --junitxml=reports/junit.xml
+          xvfb-run pytest -q --junitxml=reports/junit.xml --html=reports/report.html --self-contained-html
 
-      - name: Upload test report
+      - name: Upload test report (junit.xml)
         uses: actions/upload-artifact@v4
         with:
           name: pytest-report
           path: reports/junit.xml
+          if-no-files-found: ignore
+
+      - name: Upload HTML test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-html-report
+          path: reports/report.html
           if-no-files-found: ignore
