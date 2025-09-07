@@ -1,12 +1,10 @@
-name: CI
+name: CI - Playwright (Ubuntu)
 
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      REPORT_DIR: reports
 
     steps:
       - uses: actions/checkout@v4
@@ -16,31 +14,23 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install deps
+      - name: Install python deps
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt || python -m pip install playwright pytest pytest-playwright pytest-html
+          if [ -s requirements.txt ]; then python -m pip install -r requirements.txt; else python -m pip install playwright pytest pytest-playwright pytest-html; fi
 
-      - name: Install Playwright browsers
+      - name: Install Playwright browsers & system deps (official)
         uses: microsoft/playwright-github-action@v1
         with:
           browsers: 'all'
 
-      - name: Run tests & generate HTML report
+      - name: Run tests & create HTML report
         run: |
-          mkdir -p $REPORT_DIR
-          pytest --html=$REPORT_DIR/report.html --self-contained-html --junitxml=$REPORT_DIR/junit.xml || true
+          mkdir -p reports
+          pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml || true
 
-      - name: Upload HTML report
+      - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-html-report
-          path: ${{ env.REPORT_DIR }}/report.html
-          if-no-files-found: error
-
-      - name: Upload junit xml
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-junit
-          path: ${{ env.REPORT_DIR }}/junit.xml
-          if-no-files-found: ignore
+          name: pytest-html
+          path: reports/report.html
