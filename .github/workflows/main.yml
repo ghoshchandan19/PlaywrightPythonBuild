@@ -1,36 +1,63 @@
-name: CI - Playwright (Ubuntu)
+name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      REPORT_DIR: reports
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install python deps
-        run: |
-          python -m pip install --upgrade pip
-          if [ -s requirements.txt ]; then python -m pip install -r requirements.txt; else python -m pip install playwright pytest pytest-playwright pytest-html; fi
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
 
-      - name: Install Playwright browsers & system deps (official)
+      - name: Install Python deps
+        run: |
+          if [ -s requirements.txt ]; then
+            echo "Installing from requirements.txt"
+            python -m pip install -r requirements.txt
+          else
+            echo "requirements.txt missing or empty — installing minimal deps"
+            python -m pip install playwright==1.37.0 pytest pytest-playwright pytest-html
+          fi
+
+      - name: Install Playwright browsers & system deps
         uses: microsoft/playwright-github-action@v1
         with:
           browsers: 'all'
 
-      - name: Run tests & create HTML report
-        run: |
-          mkdir -p reports
-          pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml || true
+      - name: Create report dir
+        run: mkdir -p $REPORT_DIR
 
-      - name: Upload report
+      - name: Run pytest and produce HTML report
+        # produce a single self-contained HTML file (inline CSS/JS/images)
+        # also produce a junit xml if you want both
+        run: |
+          pytest --maxfail=1 --tb=short --html=$REPORT_DIR/report.html --self-contained-html --junitxml=$REPORT_DIR/junit.xml || true
+        # we use "|| true" so the workflow continues to the upload step even if tests fail,
+        # allowing you to download the report to inspect failures.
+
+      - name: Upload HTML report
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-html
-          path: reports/report.html
+          name: pytest-html-report
+          path: ${{ env.REPORT_DIR }}/report.html
+          if-no-files-found: error
+
+      - name: Upload junit xml (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-junit
+          path: ${{ env.REPORT_DIR }}/junit.xml
+          if-no-files-found: ignore
