@@ -1,45 +1,27 @@
-name: CI + Publish Test Report
+name: CI
 
-on:
-  push:
-  pull_request:
-
-# Grant the permissions needed to publish Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+on: [push, pull_request]
 
 jobs:
-  build-and-publish:
+  test:
     runs-on: ubuntu-latest
     env:
       REPORT_DIR: reports
-      SITE_DIR: site
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Upgrade pip
-        run: python -m pip install --upgrade pip
-
-      - name: Install Python deps
+      - name: Install deps
         run: |
-          if [ -s requirements.txt ]; then
-            echo "Installing from requirements.txt"
-            python -m pip install -r requirements.txt
-          else
-            echo "requirements.txt missing or empty — installing minimal deps"
-            python -m pip install playwright==1.37.0 pytest pytest-playwright pytest-html
-          fi
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt || python -m pip install playwright pytest pytest-playwright pytest-html
 
-      - name: Install Playwright browsers & system deps
+      - name: Install Playwright browsers
         uses: microsoft/playwright-github-action@v1
         with:
           browsers: 'all'
@@ -47,25 +29,18 @@ jobs:
       - name: Run tests & generate HTML report
         run: |
           mkdir -p $REPORT_DIR
-          # Create the HTML report (self-contained) + junit xml
-          pytest --maxfail=1 --tb=short --html=$REPORT_DIR/report.html --self-contained-html --junitxml=$REPORT_DIR/junit.xml || true
-          # Ensure we always continue so the report is uploaded even if tests fail
+          pytest --html=$REPORT_DIR/report.html --self-contained-html --junitxml=$REPORT_DIR/junit.xml || true
 
-      - name: Prepare site directory
-        run: |
-          mkdir -p $SITE_DIR
-          # Put report.html as index.html so Pages serves it at repo root
-          cp $REPORT_DIR/report.html $SITE_DIR/index.html
-          ls -la $SITE_DIR
-
-      - name: Upload artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@v1
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
         with:
-          path: ${{ env.SITE_DIR }}
+          name: pytest-html-report
+          path: ${{ env.REPORT_DIR }}/report.html
+          if-no-files-found: error
 
-  deploy:
-    needs: build-and-publish
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+      - name: Upload junit xml
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-junit
+          path: ${{ env.REPORT_DIR }}/junit.xml
+          if-no-files-found: ignore
