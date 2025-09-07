@@ -7,9 +7,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      REPORT_DIR: reports
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,42 +19,30 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install Python deps
+      - name: Install dependencies (use requirements.txt if non-empty)
         run: |
           if [ -s requirements.txt ]; then
             echo "Installing from requirements.txt"
             python -m pip install -r requirements.txt
           else
             echo "requirements.txt missing or empty — installing minimal deps"
-            python -m pip install playwright==1.37.0 pytest pytest-playwright pytest-html
+            python -m pip install playwright pytest pytest-playwright
           fi
 
-      - name: Install Playwright browsers & system deps
-        uses: microsoft/playwright-github-action@v1
-        with:
-          browsers: 'all'
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps
 
-      - name: Create report dir
-        run: mkdir -p $REPORT_DIR
+      - name: Install Playwright browsers
+        run: python -m playwright install
 
-      - name: Run pytest and produce HTML report
-        # produce a single self-contained HTML file (inline CSS/JS/images)
-        # also produce a junit xml if you want both
+      - name: Run tests
         run: |
-          pytest --maxfail=1 --tb=short --html=$REPORT_DIR/report.html --self-contained-html --junitxml=$REPORT_DIR/junit.xml || true
-        # we use "|| true" so the workflow continues to the upload step even if tests fail,
-        # allowing you to download the report to inspect failures.
+          mkdir -p reports
+          xvfb-run pytest -q --junitxml=reports/junit.xml
 
-      - name: Upload HTML report
+      - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-html-report
-          path: ${{ env.REPORT_DIR }}/report.html
-          if-no-files-found: error
-
-      - name: Upload junit xml (optional)
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-junit
-          path: ${{ env.REPORT_DIR }}/junit.xml
+          name: pytest-report
+          path: reports/junit.xml
           if-no-files-found: ignore
