@@ -1,8 +1,22 @@
 name: CI
 
+# triggers: push and pull_request run the test job automatically.
+# Use "Run workflow" (workflow_dispatch) in GitHub UI to manually choose environment and deploy.
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select environment to deploy'
+        required: true
+        default: 'qa'
+        type: choice
+        # options must be provided as a YAML sequence (below)
+        options:
+          - qa
+          - test
+          - prod
 
 jobs:
   test:
@@ -53,3 +67,33 @@ jobs:
           name: pytest-html-report
           path: reports/report.html
           if-no-files-found: ignore
+
+  deploy:
+    # Ensure deploy waits for tests to complete
+    needs: test
+    runs-on: ubuntu-latest
+    # Only run deploy when workflow was manually triggered (workflow_dispatch)
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Confirm selected environment
+        run: |
+          echo "Selected environment: ${{ github.event.inputs.environment }}"
+          echo "::set-output name=env::${{ github.event.inputs.environment }}"
+        # Note: set-output is deprecated in some contexts but used here for clarity. Not strictly required.
+
+      - name: Deploy to selected environment
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          echo "Deploying to ${ENV} ..."
+          # Replace the following with your real deploy commands
+          if [ -x ./deploy.sh ]; then
+            ./deploy.sh "${ENV}"
+          else
+            echo "deploy.sh not found or not executable — simulate deploy for ${ENV}"
+          fi
+
+      - name: Notify deployment success
+        run: echo "Deployment finished for ${{ github.event.inputs.environment }}"
