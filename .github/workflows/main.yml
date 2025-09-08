@@ -3,6 +3,39 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      python_version:
+        description: 'Python version to test'
+        required: true
+        default: '3.10'
+        type: choice
+        options:
+          - '3.9'
+          - '3.10'
+          - '3.11'
+          - '3.12'
+      browser:
+        description: 'Browser to test'
+        required: true
+        default: 'chromium'
+        type: choice
+        options:
+          - 'chromium'
+          - 'firefox'
+          - 'webkit'
+          - 'all'
+      headless:
+        description: 'Run in headless mode'
+        required: true
+        default: 'true'
+        type: boolean
+
+env:
+  PYTHON_VERSION: ${{ github.event.inputs.python_version || '3.10' }}
+  BROWSER: ${{ github.event.inputs.browser || 'chromium' }}
+  HEADLESS: ${{ github.event.inputs.headless || 'true' }}
+  TEST_TIMEOUT: 30000
 
 jobs:
   test:
@@ -11,15 +44,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install dependencies (use requirements.txt if non-empty)
+      - name: Install dependencies
         run: |
           if [ -s requirements.txt ]; then
             echo "Installing from requirements.txt"
@@ -35,21 +68,21 @@ jobs:
       - name: Install Playwright browsers
         run: python -m playwright install
 
-      - name: Run tests and generate HTML report
+      - name: Run tests
         run: |
           mkdir -p reports
-          xvfb-run pytest -q --junitxml=reports/junit.xml --html=reports/report.html --self-contained-html
+          xvfb-run pytest -q --junitxml=reports/junit.xml --html=reports/report.html --self-contained-html --browser=${{ env.BROWSER }} --timeout=${{ env.TEST_TIMEOUT }}
 
-      - name: Upload test report (junit.xml)
+      - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-report
+          name: pytest-report-${{ env.PYTHON_VERSION }}-${{ env.BROWSER }}
           path: reports/junit.xml
           if-no-files-found: ignore
 
       - name: Upload HTML test report
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-html-report
+          name: pytest-html-report-${{ env.PYTHON_VERSION }}-${{ env.BROWSER }}
           path: reports/report.html
           if-no-files-found: ignore
